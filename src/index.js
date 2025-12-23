@@ -24,10 +24,9 @@ app.get("/db-test", async (req, res) => {
   }
 });
 
-
-
+// =========================
 // CREATE Pokémon
-
+// =========================
 app.post("/api/pokemon", async (req, res) => {
   try {
     const { name, nickname, type, level, evolution_line } = req.body;
@@ -57,15 +56,46 @@ app.post("/api/pokemon", async (req, res) => {
   }
 });
 
-
-
-// READ all Pokémon
-
+// =========================
+// READ Pokémon (FILTER + SORT)
+// =========================
 app.get("/api/pokemon", async (req, res) => {
   try {
-    const result = await pool.query(
-      "SELECT * FROM caught pokemon ORDER BY level DESC"
-    );
+    const { type, minLevel, sort = "level", order = "desc" } = req.query;
+
+    const allowedSortFields = ["level", "name"];
+    const allowedOrder = ["asc", "desc"];
+
+    let query = "SELECT * FROM caught_pokemon";
+    const values = [];
+    const conditions = [];
+
+    // Filter by type
+    if (type) {
+      values.push(type);
+      conditions.push(`LOWER(type) = LOWER($${values.length})`);
+    }
+
+    // Filter by minimum level
+    if (minLevel) {
+      values.push(Number(minLevel));
+      conditions.push(`level >= $${values.length}`);
+    }
+
+    // Apply WHERE conditions
+    if (conditions.length > 0) {
+      query += " WHERE " + conditions.join(" AND ");
+    }
+
+    // Validate sorting
+    const sortField = allowedSortFields.includes(sort) ? sort : "level";
+    const sortOrder = allowedOrder.includes(order.toLowerCase())
+      ? order.toUpperCase()
+      : "DESC";
+
+    query += ` ORDER BY ${sortField} ${sortOrder}`;
+
+    const result = await pool.query(query, values);
     res.json(result.rows);
   } catch (err) {
     console.error(err);
@@ -73,10 +103,9 @@ app.get("/api/pokemon", async (req, res) => {
   }
 });
 
-
-
+// =========================
 // UPDATE Pokémon
-
+// =========================
 app.put("/api/pokemon/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -105,9 +134,9 @@ app.put("/api/pokemon/:id", async (req, res) => {
   }
 });
 
-
+// =========================
 // DELETE Pokémon
-
+// =========================
 app.delete("/api/pokemon/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -128,12 +157,13 @@ app.delete("/api/pokemon/:id", async (req, res) => {
   }
 });
 
+// Root route
+app.get("/", (req, res) => {
+  res.send("Pokemon API is running");
+});
 
 // Server start
 const PORT = 5000;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
-});
-app.get("/", (req, res) => {
-  res.send("Pokemon API is running");
 });
