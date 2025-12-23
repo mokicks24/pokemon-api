@@ -11,6 +11,32 @@ app.use(cors());
 app.use(express.json());
 
 // =========================
+// Validation middleware
+// =========================
+const validatePokemon = (req, res, next) => {
+  const { name, type, level } = req.body;
+  const allowedTypes = ["Fire", "Water", "Grass", "Electric"];
+
+  if (!name || typeof name !== "string") {
+    return res.status(400).json({ error: "Valid name is required" });
+  }
+
+  if (type && !allowedTypes.includes(type)) {
+    return res.status(400).json({
+      error: `Type must be one of: ${allowedTypes.join(", ")}`
+    });
+  }
+
+  if (level !== undefined && (isNaN(level) || level <= 0)) {
+    return res.status(400).json({
+      error: "Level must be a positive number"
+    });
+  }
+
+  next();
+};
+
+// =========================
 // Health check
 // =========================
 app.get("/health", (req, res) => {
@@ -33,13 +59,9 @@ app.get("/db-test", async (req, res) => {
 // =========================
 // CREATE Pokémon
 // =========================
-app.post("/api/pokemon", async (req, res) => {
+app.post("/api/pokemon", validatePokemon, async (req, res) => {
   try {
     const { name, nickname, type, level, evolution_line } = req.body;
-
-    if (!name) {
-      return res.status(400).json({ error: "Name is required" });
-    }
 
     const result = await pool.query(
       `INSERT INTO caught_pokemon
@@ -98,22 +120,7 @@ app.get("/api/pokemon", async (req, res) => {
 });
 
 // =========================
-// GET favorite Pokémon
-// =========================
-app.get("/api/pokemon/favorites", async (req, res) => {
-  try {
-    const result = await pool.query(
-      "SELECT * FROM caught_pokemon WHERE is_favorite = true ORDER BY level DESC"
-    );
-    res.json(result.rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to fetch favorites" });
-  }
-});
-
-// =========================
-// TOGGLE favorite Pokémon
+// FAVORITES
 // =========================
 app.patch("/api/pokemon/:id/favorite", async (req, res) => {
   try {
@@ -138,33 +145,22 @@ app.patch("/api/pokemon/:id/favorite", async (req, res) => {
   }
 });
 
-// =========================
-// READ single Pokémon by ID
-// =========================
-app.get("/api/pokemon/:id", async (req, res) => {
+app.get("/api/pokemon/favorites", async (req, res) => {
   try {
-    const { id } = req.params;
-
     const result = await pool.query(
-      "SELECT * FROM caught_pokemon WHERE id = $1",
-      [id]
+      "SELECT * FROM caught_pokemon WHERE is_favorite = true ORDER BY level DESC"
     );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Pokemon not found" });
-    }
-
-    res.json(result.rows[0]);
+    res.json(result.rows);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to fetch Pokémon" });
+    res.status(500).json({ error: "Failed to fetch favorites" });
   }
 });
 
 // =========================
 // UPDATE Pokémon
 // =========================
-app.put("/api/pokemon/:id", async (req, res) => {
+app.put("/api/pokemon/:id", validatePokemon, async (req, res) => {
   try {
     const { id } = req.params;
     const { name, nickname, type, level, evolution_line } = req.body;
@@ -223,9 +219,9 @@ app.get("/", (req, res) => {
 });
 
 // =========================
-// Server start
+// Start server
 // =========================
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
