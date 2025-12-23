@@ -64,12 +64,12 @@ app.post("/api/pokemon", async (req, res) => {
 app.get("/api/pokemon", async (req, res) => {
   try {
     const result = await pool.query(
-      "SELECT * FROM caught_pokemon ORDER BY id DESC"
+      "SELECT * FROM caught pokemon ORDER BY level DESC"
     );
     res.json(result.rows);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to fetch pokemon" });
+    res.status(500).json({ error: "Failed to fetch Pokémon" });
   }
 });
 
