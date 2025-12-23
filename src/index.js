@@ -4,16 +4,22 @@ import { pool } from "./db.js";
 
 const app = express();
 
+// =========================
 // Middleware
+// =========================
 app.use(cors());
 app.use(express.json());
 
+// =========================
 // Health check
+// =========================
 app.get("/health", (req, res) => {
   res.json({ status: "API is running" });
 });
 
+// =========================
 // DB test
+// =========================
 app.get("/db-test", async (req, res) => {
   try {
     const result = await pool.query("SELECT NOW()");
@@ -57,46 +63,57 @@ app.post("/api/pokemon", async (req, res) => {
 });
 
 // =========================
-// READ Pokémon (FILTER + SORT)
+// READ all Pokémon (filter + sort)
 // =========================
 app.get("/api/pokemon", async (req, res) => {
   try {
-    const { type, minLevel, sort = "level", order = "desc" } = req.query;
-
-    const allowedSortFields = ["level", "name"];
-    const allowedOrder = ["asc", "desc"];
+    const { type, minLevel } = req.query;
 
     let query = "SELECT * FROM caught_pokemon";
     const values = [];
     const conditions = [];
 
-    // Filter by type
     if (type) {
       values.push(type);
       conditions.push(`LOWER(type) = LOWER($${values.length})`);
     }
 
-    // Filter by minimum level
     if (minLevel) {
       values.push(Number(minLevel));
       conditions.push(`level >= $${values.length}`);
     }
 
-    // Apply WHERE conditions
     if (conditions.length > 0) {
       query += " WHERE " + conditions.join(" AND ");
     }
 
-    // Validate sorting
-    const sortField = allowedSortFields.includes(sort) ? sort : "level";
-    const sortOrder = allowedOrder.includes(order.toLowerCase())
-      ? order.toUpperCase()
-      : "DESC";
-
-    query += ` ORDER BY ${sortField} ${sortOrder}`;
+    query += " ORDER BY level DESC";
 
     const result = await pool.query(query, values);
     res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch Pokémon" });
+  }
+});
+
+// =========================
+// READ single Pokémon by ID (NEW)
+// =========================
+app.get("/api/pokemon/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(
+      "SELECT * FROM caught_pokemon WHERE id = $1",
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Pokemon not found" });
+    }
+
+    res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to fetch Pokémon" });
@@ -157,12 +174,16 @@ app.delete("/api/pokemon/:id", async (req, res) => {
   }
 });
 
+// =========================
 // Root route
+// =========================
 app.get("/", (req, res) => {
   res.send("Pokemon API is running");
 });
 
+// =========================
 // Server start
+// =========================
 const PORT = 5000;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
