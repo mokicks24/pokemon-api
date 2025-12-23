@@ -42,7 +42,7 @@ app.post("/api/pokemon", async (req, res) => {
     }
 
     const result = await pool.query(
-      `INSERT INTO caught_pokemon 
+      `INSERT INTO caught_pokemon
        (name, nickname, type, level, evolution_line)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
@@ -98,7 +98,48 @@ app.get("/api/pokemon", async (req, res) => {
 });
 
 // =========================
-// READ single Pokémon by ID (NEW)
+// GET favorite Pokémon
+// =========================
+app.get("/api/pokemon/favorites", async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT * FROM caught_pokemon WHERE is_favorite = true ORDER BY level DESC"
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch favorites" });
+  }
+});
+
+// =========================
+// TOGGLE favorite Pokémon
+// =========================
+app.patch("/api/pokemon/:id/favorite", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(
+      `UPDATE caught_pokemon
+       SET is_favorite = NOT is_favorite
+       WHERE id = $1
+       RETURNING *`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Pokemon not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to toggle favorite" });
+  }
+});
+
+// =========================
+// READ single Pokémon by ID
 // =========================
 app.get("/api/pokemon/:id", async (req, res) => {
   try {
